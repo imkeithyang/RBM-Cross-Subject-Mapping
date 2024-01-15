@@ -46,14 +46,6 @@ parser = ArgumentParser(
     description=__doc__, formatter_class=ArgumentDefaultsHelpFormatter
 )
 parser.add_argument(
-    "-z_eval",
-    "--z_eval",
-    dest="z_eval",
-    default="0",
-    help="Z to eval",
-    required=True,
-)
-parser.add_argument(
     "-d",
     "--datapath",
     dest="datapath",
@@ -71,7 +63,7 @@ x = loadmat(datapath + 'Moths/Moth10_20201013_AnnotatedToShare_v3.mat')
 x.keys()
 
 # Somewhat global variables (never change)
-path = "/hpc/group/tarokhlab/hy190/data/Moths/Moth"
+path = datapath
 index_database = [ [1       , 2       , 3       , 4       , 5       , 6       , 7       , 8       , 9       ,       10], 
                    [20200113, 20200114, 20200219, 20200221, 20200226, 20200818, 20200819, 20200915, 20201006, 20201013] ]
 missing_data_indices_database = [ [2-1,10-1], [], [6-1], [7-1], [2-1,6-1], [], [9-1], [], [], [6-1,10-1] ]
