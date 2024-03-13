@@ -13,7 +13,7 @@ from sklearn import preprocessing
 from scipy.io import loadmat
 from scipy.io import savemat
 import pickle
-from RBM_CrossSubject_MothData.hiwa import HiWA
+from hiwa import HiWA
 from scipy.linalg import sqrtm, orth
 from sklearn.decomposition import PCA
 
@@ -59,7 +59,7 @@ parser.add_argument(
     dest="datapath",
     default="",
     help="Data Path",
-    required=True,
+    required=False,
 )
 
 args = parser.parse_args()
@@ -120,7 +120,7 @@ for sigma in sigmas:
         signals, _, _, targets = GaussianKernelFiltering( spike_times, targets, sum(no_Trials[0]), all_neurons, stimuli, duration, fs, sigma )
         signals = signals.reshape((signals.shape[0],signals.shape[1]*signals.shape[2]))
         signals_Z[Z.index(index)], targets_Z[Z.index(index)], no_Trials_Z = signals, targets, np.minimum(no_Trials_Z,no_Trials[0])
-
+    savemat("pdata.mat", {'signals_Z': signals_Z, 'targets_Z':targets_Z, 'no_Trials_Z':no_Trials_Z})
     for omega in omegas:
 
         train_sizes = (omega*no_Trials_Z).astype('int').tolist()

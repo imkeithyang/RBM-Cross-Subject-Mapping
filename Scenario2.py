@@ -13,7 +13,7 @@ from sklearn import preprocessing
 from scipy.io import loadmat
 from scipy.io import savemat
 import pickle
-from RBM_CrossSubject_MothData.hiwa import HiWA
+from hiwa import HiWA
 from scipy.linalg import sqrtm, orth
 from sklearn.decomposition import PCA
 
