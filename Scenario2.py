@@ -13,7 +13,6 @@ from sklearn import preprocessing
 from scipy.io import loadmat
 from scipy.io import savemat
 import pickle
-from hiwa import HiWA
 from scipy.linalg import sqrtm, orth
 from sklearn.decomposition import PCA
 
@@ -51,11 +50,11 @@ parser.add_argument(
     dest="datapath",
     default="",
     help="Data Path",
-    required=True,
+    required=False,
 )
 
 args = parser.parse_args()
-eval_index = args.z_eval
+
 
 datapath = args.datapath
 
@@ -74,7 +73,7 @@ stimuli = [0,1,2,3,4,5]
 colors = ['orange','red','gold','limegreen','dodgerblue','darkviolet']
 stimuli_names = ['pitch up','pitch down','roll left','roll right','yaw left','yaw right']
 
-
+path = "/hpc/group/tarokhlab/hy190/data/Moths/Moth"
 # These are also global variables (change in different studies)
 
 fs, duration = 10e3, 0.06
@@ -82,7 +81,7 @@ T = int(fs*duration)
 N = 10
 sigmas = [0.0025]
 
-MCT = 100
+MCT = 5
 X_Seeds = list(range(MCT))
 E, batch_size = 350, 150
 learning_rates = {}
@@ -92,7 +91,7 @@ init_tol = 1e-1
 
 Thresholds = [ 10 ]
 no_HiddenUnits = [ 15 ]
-omegas = [ 0.5 ]
+omegas = [ 0.8 ]
 
 Z = [1,2,3,4,6,7,8,9,10]
 
@@ -126,7 +125,7 @@ for sigma in sigmas:
     for omega in omegas:
 
         train_sizes = (omega*no_Trials_Z).astype('int').tolist()
-        test_sizes = (0.9*(1-omega)*no_Trials_Z).astype('int').tolist()
+        test_sizes = ((1-omega)*no_Trials_Z).astype('int').tolist()
 
         for Threshold in Thresholds:
 
@@ -143,8 +142,9 @@ for sigma in sigmas:
                 for lr in learning_rates['both_MLandF']:
                 
                     for m in range(MCT):
-
-                        signals_Z_train, signals_Z_test, targets_Z_train, targets_Z_test, P_Z = TrainTestSplit_HorizontalSubjMerge(Z, stimuli, signals_Z, targets_Z, train_sizes, test_sizes, Threshold, m)
+                        if MCT == 5:
+                            cv = True
+                        signals_Z_train, signals_Z_test, targets_Z_train, targets_Z_test, P_Z = TrainTestSplit_HorizontalSubjMerge(Z, stimuli, signals_Z, targets_Z, train_sizes, test_sizes, Threshold, m, cv, m)
                         print(100*'-')
                         print('Training Data shapes: {}, {}'.format(signals_Z_train.shape, targets_Z_train.shape)) 
                         print(' Testing Data shapes: {}, {}'.format(signals_Z_test.shape, targets_Z_test.shape)) 
@@ -179,12 +179,12 @@ for sigma in sigmas:
                                 signals_Z_test_init[:, P_Z['moth-{}'.format(index)][0]:P_Z['moth-{}'.format(index)][1]+1] = signals_Z_test_init_temp[:, P_Z['moth-{}'.format(index)][0]:P_Z['moth-{}'.format(index)][1]+1]
                                 del signals_Z_test_init_temp
                                 
-                                signals_Z_test_pred, _ = test_RBM_forTL ( MLRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=1 )
+                                signals_Z_test_pred, _ = test_RBM_forTL ( MLRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=5 )
                                 for other_index in Z:
                                     if other_index != index:
                                         Rate_MLRBM['moth_S_is_{}_D_is_{}'.format(index,other_index)][epoch,m], _, _ = TrainTest_LinearDecoder ( clf=clfs_Z['clf_moth-{}'.format(other_index)], signals_test=signals_Z_test_pred[:,P_Z['moth-{}'.format(other_index)][0]:P_Z['moth-{}'.format(other_index)][1]+1].cpu().numpy().astype('float64'), targets_test=np.expand_dims(targets_Z_test[:,0],axis=1), mode='test' )
                                        
-                                signals_Z_test_pred, _ = test_RBM_forTL ( FRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=1 )
+                                signals_Z_test_pred, _ = test_RBM_forTL ( FRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=5 )
                                 for other_index in Z:
                                     if other_index != index:
                                         Rate_FRBM['moth_S_is_{}_D_is_{}'.format(index,other_index)][epoch,m], _, _ = TrainTest_LinearDecoder ( clf=clfs_Z['clf_moth-{}'.format(other_index)], signals_test=signals_Z_test_pred[:,P_Z['moth-{}'.format(other_index)][0]:P_Z['moth-{}'.format(other_index)][1]+1].cpu().numpy().astype('float64'), targets_test=np.expand_dims(targets_Z_test[:,0],axis=1), mode='test' )
@@ -199,12 +199,12 @@ for sigma in sigmas:
                             if epoch % (E//20) == 0:
                                 print('-'*50)
                     
-                    savemat('Results/SCENARIO_II_CD_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
+                    savemat('Results_CV/k=5SCENARIO_II_CD_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
                             {'X_Seeds':X_Seeds,'MCT':MCT,
                             'fs':fs,'duration':duration,
                             'E':E,'batch_size':batch_size,'learning_rates':learning_rates,'weight_decay':weight_decay,'step_size':step_size,'gamma':gamma,
                             'Rate_LDA':Rate_LDA,'Rate_MLRBM':Rate_MLRBM})
-                    savemat('Results/SCENARIO_II_F_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
+                    savemat('Results_CV/k=5SCENARIO_II_F_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
                             {'X_Seeds':X_Seeds,'MCT':MCT,
                             'fs':fs,'duration':duration,
                             'E':E,'batch_size':batch_size,'learning_rates':learning_rates,'weight_decay':weight_decay,'step_size':step_size,'gamma':gamma,

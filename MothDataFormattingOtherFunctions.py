@@ -117,7 +117,16 @@ def TrainTest_LinearDecoder( clf, signals_train=[], targets_train=[], signals_te
 
 ########################################################################################################################################################################################################################################################################################
 
-def train_test_split_perGroup ( signals, targets, groups, train_sizes, test_sizes, random_state ):
+def train_test_split_cv ( signals, targets, train_index, test_index ):
+    signals_train = signals[train_index]
+    targets_train = targets[train_index]
+    signals_test = signals[test_index]
+    targets_test = targets[test_index]
+    
+    return signals_train, signals_test, targets_train, targets_test
+
+
+def train_test_split_perGroup ( signals, targets, groups, train_sizes, test_sizes, random_state, cv, cv_ind ):
     
     '''
         a function that overrides the standard train_test_split function from sklearn.model_selection such that it accepts a list for the train_size and test_size arguments
@@ -132,12 +141,17 @@ def train_test_split_perGroup ( signals, targets, groups, train_sizes, test_size
         signals_perGroup = signals[targets.squeeze(1)==group,:]
         targets_perGroup = targets[targets.squeeze(1)==group,:]
         
-        signals_train_perGroup, signals_perGroup_remain, targets_train_perGroup, targets_perGroup_remain = train_test_split(signals_perGroup, targets_perGroup, train_size=train_size, random_state=random_state )
-        
+        if cv:
+            tot_index = np.arange(0,train_size + test_size)
+            test_index = tot_index[cv_ind * test_size: (cv_ind + 1) * test_size]
+            train_index = np.delete(tot_index, test_index)
+            signals_train_perGroup, signals_perGroup_remain, targets_train_perGroup, targets_perGroup_remain = train_test_split_cv(signals_perGroup, targets_perGroup, train_index, test_index )
+        else:
+            signals_train_perGroup, signals_perGroup_remain, targets_train_perGroup, targets_perGroup_remain = train_test_split(signals_perGroup, targets_perGroup, train_size=train_size, random_state=random_state )
         signals_train = np.concatenate((signals_train,signals_train_perGroup),axis=0)
         targets_train = np.concatenate((targets_train,targets_train_perGroup),axis=0)
         
-        if test_size != None:
+        if test_size != None and not cv:
             _, signals_test_perGroup, _, targets_test_perGroup = train_test_split(signals_perGroup_remain, targets_perGroup_remain, test_size=test_size, random_state=random_state)
         else:
             signals_test_perGroup, targets_test_perGroup = signals_perGroup_remain, targets_perGroup_remain
@@ -149,7 +163,7 @@ def train_test_split_perGroup ( signals, targets, groups, train_sizes, test_size
 
 ########################################################################################################################################################################################################################################################################################
 
-def TrainTestSplit_VerticalSubjMerge( subjects, stimuli, signals, targets, train_sizes, test_sizes, out_dims, random_state, should_I_PCA, should_I_jointPCA ):
+def TrainTestSplit_VerticalSubjMerge( subjects, stimuli, signals, targets, train_sizes, test_sizes, out_dims, random_state, should_I_PCA, should_I_jointPCA, cv):
     
     signals_train, signals_test = np.empty((0,out_dims[0])), np.empty((0,out_dims[0]))
     targets_train, targets_test = np.empty((0,1)), np.empty((0,1))
@@ -189,15 +203,15 @@ def TrainTestSplit_VerticalSubjMerge( subjects, stimuli, signals, targets, train
 
 ########################################################################################################################################################################################################################################################################################
 
-def TrainTestSplit_HorizontalSubjMerge( subjects, stimuli, signals, targets, train_sizes, test_sizes, Threshold, random_state ):
+def TrainTestSplit_HorizontalSubjMerge( subjects, stimuli, signals, targets, train_sizes, test_sizes, Threshold, random_state, cv, cv_ind ):
     
-    signals_train, signals_test = np.empty((sum(train_sizes),0)), np.empty((sum(test_sizes),0))
-    targets_train, targets_test = np.empty((sum(train_sizes),0)), np.empty((sum(test_sizes),0))
+    signals_train, signals_test = [],[]
+    targets_train, targets_test = [],[]
     P = {}
         
     for index in subjects:
                                        
-        signals_train_subj, signals_test_subj, targets_train_subj, targets_test_subj = train_test_split_perGroup( signals[subjects.index(index)], targets[subjects.index(index)], stimuli, train_sizes, test_sizes, random_state )
+        signals_train_subj, signals_test_subj, targets_train_subj, targets_test_subj = train_test_split_perGroup( signals[subjects.index(index)], targets[subjects.index(index)], stimuli, train_sizes, test_sizes, random_state, cv=cv, cv_ind=cv_ind )
         
         if Threshold <=1:
             pca = PCA()
@@ -216,11 +230,16 @@ def TrainTestSplit_HorizontalSubjMerge( subjects, stimuli, signals, targets, tra
         print('training data set size for moth-{} (tl & clf): {}'.format(index,signals_train_subj.shape))
         print('           testing  data set size for moth-{}: {}'.format(index,signals_test_subj.shape))
         
-        P['moth-{}'.format(index)] = (signals_train.shape[1], signals_train.shape[1]+n_components-1)
-        signals_train = np.concatenate((signals_train,signals_train_subj),axis=1)
-        targets_train = np.concatenate((targets_train,targets_train_subj),axis=1)
-        signals_test = np.concatenate((signals_test,signals_test_subj),axis=1)
-        targets_test = np.concatenate((targets_test,targets_test_subj),axis=1)
+        P['moth-{}'.format(index)] = (signals_train_subj.shape[1], signals_train_subj.shape[1]+n_components-1)
+        signals_train.append(signals_train_subj)
+        targets_train.append(targets_train_subj)
+        signals_test.append(signals_test_subj)
+        targets_test.append(targets_test_subj)
+        
+    signals_train = np.concatenate(signals_train, axis=1)
+    targets_train = np.concatenate(targets_train, axis=1)
+    signals_test = np.concatenate(signals_test, axis=1)
+    targets_test = np.concatenate(targets_test, axis=1)
     
     return signals_train, signals_test, targets_train, targets_test, P
 ########################################################################################################################################################################################################################################################################################

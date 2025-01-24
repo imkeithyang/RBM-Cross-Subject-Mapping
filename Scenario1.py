@@ -13,7 +13,6 @@ from sklearn import preprocessing
 from scipy.io import loadmat
 from scipy.io import savemat
 import pickle
-from hiwa import HiWA
 from scipy.linalg import sqrtm, orth
 from sklearn.decomposition import PCA
 
@@ -46,6 +45,14 @@ parser = ArgumentParser(
     description=__doc__, formatter_class=ArgumentDefaultsHelpFormatter
 )
 parser.add_argument(
+    "-z_eval",
+    "--z_eval",
+    dest="z_eval",
+    default="0",
+    help="Z to eval",
+    required=False,
+)
+parser.add_argument(
     "-d",
     "--datapath",
     dest="datapath",
@@ -63,7 +70,7 @@ x = loadmat(datapath + 'Moths/Moth10_20201013_AnnotatedToShare_v3.mat')
 x.keys()
 
 # Somewhat global variables (never change)
-path = datapath
+path = "/hpc/group/tarokhlab/hy190/data/Moths/Moth"
 index_database = [ [1       , 2       , 3       , 4       , 5       , 6       , 7       , 8       , 9       ,       10], 
                    [20200113, 20200114, 20200219, 20200221, 20200226, 20200818, 20200819, 20200915, 20201006, 20201013] ]
 missing_data_indices_database = [ [2-1,10-1], [], [6-1], [7-1], [2-1,6-1], [], [9-1], [], [], [6-1,10-1] ]
@@ -81,7 +88,7 @@ T = int(fs*duration)
 N = 10
 sigmas = [0.0025] #[ 0.0005, 0.001, 0.0025, 0.005, 0.0075, 0.01, 0.025 ]
 
-MCT = 100
+MCT = 5
 X_Seeds = list(range(MCT))
 E, batch_size = 350, 150
 learning_rates = {}
@@ -91,7 +98,7 @@ init_tol = 1e-1
 
 Thresholds = [ 10 ]
 no_HiddenUnits = [ 15 ]
-omegas = [ 0.5 ]
+omegas = [ 0.8 ]
 
 Z = [1,2,3,4,6,7,8,9,10]
 
@@ -112,11 +119,11 @@ for sigma in sigmas:
         signals, _, _, targets = GaussianKernelFiltering( spike_times, targets, sum(no_Trials[0]), all_neurons, stimuli, duration, fs, sigma )
         signals = signals.reshape((signals.shape[0],signals.shape[1]*signals.shape[2]))
         signals_Z[Z.index(index)], targets_Z[Z.index(index)], no_Trials_Z = signals, targets, np.minimum(no_Trials_Z,no_Trials[0])
-    savemat("pdata.mat", {'signals_Z': signals_Z, 'targets_Z':targets_Z, 'no_Trials_Z':no_Trials_Z})
+
     for omega in omegas:
 
         train_sizes = (omega*no_Trials_Z).astype('int').tolist()
-        test_sizes = (0.9*(1-omega)*no_Trials_Z).astype('int').tolist()
+        test_sizes = ((1-omega)*no_Trials_Z).astype('int').tolist()
 
         for Threshold in Thresholds:
 
@@ -131,10 +138,10 @@ for sigma in sigmas:
                     Rate_HiWA['moth_{}'.format(index)] = np.zeros((MCT))
                 
                 for lr in learning_rates['both_MLandF']:
-                
                     for m in range(MCT):
-
-                        signals_Z_train, signals_Z_test, targets_Z_train, targets_Z_test, P_Z = TrainTestSplit_HorizontalSubjMerge(Z, stimuli, signals_Z, targets_Z, train_sizes, test_sizes, Threshold, m)
+                        if MCT == 5:
+                            cv = True
+                        signals_Z_train, signals_Z_test, targets_Z_train, targets_Z_test, P_Z = TrainTestSplit_HorizontalSubjMerge(Z, stimuli, signals_Z, targets_Z, train_sizes, test_sizes, Threshold, m, cv, cv_ind = m)
                         print(100*'-')
                         print('Training Data shapes: {}, {}'.format(signals_Z_train.shape, targets_Z_train.shape)) 
                         print(' Testing Data shapes: {}, {}'.format(signals_Z_test.shape, targets_Z_test.shape)) 
@@ -169,9 +176,9 @@ for sigma in sigmas:
                                 signals_Z_test_init = signals_Z_test.copy()
                                 signals_Z_test_init[:, P_Z['moth-{}'.format(index)][0]:P_Z['moth-{}'.format(index)][1]+1] = np.random.randn(signals_Z_test_init.shape[0], P_Z['moth-{}'.format(index)][1]-P_Z['moth-{}'.format(index)][0]+1)
 
-                                signals_Z_test_pred, _ = test_RBM_forTL ( MLRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=1 )
+                                signals_Z_test_pred, _ = test_RBM_forTL ( MLRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=5 )
                                 Rate_MLRBM['moth_{}'.format(index)][epoch,m], _, _ = TrainTest_LinearDecoder ( clf=clfs_Z['clf_moth-{}'.format(index)], signals_test=signals_Z_test_pred[:,P_Z['moth-{}'.format(index)][0]:P_Z['moth-{}'.format(index)][1]+1].cpu().numpy().astype('float64'), targets_test=np.expand_dims(targets_Z_test[:,0],axis=1), mode='test' )
-                                signals_Z_test_pred, _ = test_RBM_forTL ( FRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=1 )
+                                signals_Z_test_pred, _ = test_RBM_forTL ( FRBM, torch.from_numpy(signals_Z_test_init).float().to(device), k=5 )
                                 Rate_FRBM['moth_{}'.format(index)][epoch,m], _, _ = TrainTest_LinearDecoder ( clf=clfs_Z['clf_moth-{}'.format(index)], signals_test=signals_Z_test_pred[:,P_Z['moth-{}'.format(index)][0]:P_Z['moth-{}'.format(index)][1]+1].cpu().numpy().astype('float64'), targets_test=np.expand_dims(targets_Z_test[:,0],axis=1), mode='test' )
 
                                 signals_Z_test_init = np.delete( signals_Z_test.copy(), slice(P_Z['moth-{}'.format(index)][0],P_Z['moth-{}'.format(index)][1]+1), 1 ).reshape((-1,Threshold))
@@ -188,12 +195,12 @@ for sigma in sigmas:
                         del FRBM
                         torch.cuda.empty_cache()
                     
-                        savemat('Results/NoHiWA_SCENARIO_I_CD_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
+                        savemat('Results_CV/k=5NoHiWA_SCENARIO_I_CD_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
                             {'X_Seeds':X_Seeds,'MCT':MCT,
                             'fs':fs,'duration':duration,
                             'E':E,'batch_size':batch_size,'learning_rates':learning_rates,'weight_decay':weight_decay,'step_size':step_size,'gamma':gamma,
                             'Rate_LDA':Rate_LDA,'Rate_MLRBM':Rate_MLRBM,'Rate_NO':Rate_NO})
-                        savemat('Results/NoHiWA_SCENARIO_I_F_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
+                        savemat('Results_CV/k=5NoHiWA_SCENARIO_I_F_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
                                 {'X_Seeds':X_Seeds,'MCT':MCT,
                                 'fs':fs,'duration':duration,
                                 'E':E,'batch_size':batch_size,'learning_rates':learning_rates,'weight_decay':weight_decay,'step_size':step_size,'gamma':gamma,

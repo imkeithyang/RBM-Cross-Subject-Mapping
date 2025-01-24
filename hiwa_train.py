@@ -13,7 +13,7 @@ from sklearn import preprocessing
 from scipy.io import loadmat
 from scipy.io import savemat
 import pickle
-from hiwa import HiWA
+from hiwa_np import HiWA
 from scipy.linalg import sqrtm, orth
 from sklearn.decomposition import PCA
 
@@ -203,12 +203,12 @@ for sigma in sigmas:
                                                                                                 signals_test=signals_Z_test_init_hiWA, 
                                                                                                 targets_test=targets_Z_test_init_hiWA, mode='test' )
 
-                        savemat('Results/08302023/NoHiWA_SCENARIO_I_CD_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
+                        savemat('Results/08302023/HiWA_SCENARIO_I_CD_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
                             {'X_Seeds':X_Seeds,'MCT':MCT,
                             'fs':fs,'duration':duration,
                             'E':E,'batch_size':batch_size,'learning_rates':learning_rates,'weight_decay':weight_decay,'step_size':step_size,'gamma':gamma,
                             'Rate_LDA':Rate_LDA,'Rate_MLRBM':Rate_MLRBM,'Rate_NO':Rate_NO})
-                        savemat('Results/08302023/NoHiWA_SCENARIO_I_F_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
+                        savemat('Results/08302023/HiWA_SCENARIO_I_F_OneMissingSubj_sigma{}_PCAThreshold{}_noHidUnit{}_lr{}_tol{}_TrainTestRatio{}.mat'.format(sigma,Threshold,h_dim,lr,init_tol,omega),
                                 {'X_Seeds':X_Seeds,'MCT':MCT,
                                 'fs':fs,'duration':duration,
                                 'E':E,'batch_size':batch_size,'learning_rates':learning_rates,'weight_decay':weight_decay,'step_size':step_size,'gamma':gamma,
